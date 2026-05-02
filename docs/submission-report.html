@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Spring Boot CRUD Assignment Report</title>
+    <style>
+        body { font-family: Arial, Helvetica, sans-serif; line-height: 1.45; color: #172033; margin: 36px; }
+        h1, h2 { color: #102a43; }
+        h1 { border-bottom: 3px solid #2f80ed; padding-bottom: 8px; }
+        code, pre { background: #f1f5f9; border-radius: 6px; }
+        pre { padding: 12px; white-space: pre-wrap; font-size: 12px; }
+        img { max-width: 100%; border: 1px solid #cbd5e1; margin: 8px 0 18px; }
+        .meta { background: #eef6ff; padding: 12px; border-left: 4px solid #2f80ed; }
+        table { width: 100%; border-collapse: collapse; margin: 12px 0; }
+        th, td { border: 1px solid #cbd5e1; padding: 8px; text-align: left; }
+    </style>
+</head>
+<body>
+<h1>Spring Boot CRUD Assignment - Question 1</h1>
+<div class="meta">
+    <strong>Name:</strong> Anshul Patyal<br>
+    <strong>Roll Number:</strong> 2024eb01137<br>
+    <strong>Project:</strong> Spring Boot JSP JPA CRUD application<br>
+    <strong>GitHub URL:</strong> https://github.com/anshpay/2024eb01137-spring-crud
+</div>
+
+<h2>1. Approach</h2>
+<p>
+    I implemented a library management application using two related entities: <code>Author</code> and <code>Book</code>.
+    The application follows a standard layered Spring Boot structure: entity classes for persistence, repository
+    interfaces for database access, service classes for business logic, controllers for Spring MVC request handling,
+    and JSP pages for the view layer.
+</p>
+
+<h2>2. Entity Relationship Design</h2>
+<table>
+    <tr><th>Entity</th><th>Main Attributes</th><th>Relationship</th></tr>
+    <tr><td>Author</td><td>id, name, specialization, email</td><td>One author can have many books</td></tr>
+    <tr><td>Book</td><td>id, title, isbn, publishedYear, author</td><td>Each book belongs to one author</td></tr>
+</table>
+<pre><code>@Entity
+public class Author {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @OneToMany(mappedBy = "author", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List&lt;Book&gt; books = new ArrayList&lt;&gt;();
+}
+
+@Entity
+public class Book {
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "author_id", nullable = false)
+    private Author author;
+}</code></pre>
+
+<h2>3. Database Population</h2>
+<p>
+    A <code>CommandLineRunner</code> named <code>DataSeeder</code> creates 10 authors and 10 books when the application starts.
+    H2 is used as the database and Hibernate creates the tables automatically through JPA annotations.
+</p>
+
+<h2>4. Create Operation</h2>
+<p>
+    JSP forms are available at <code>/authors/new</code> and <code>/books/new</code>. The controller accepts form submissions,
+    binds request parameters to entity objects, attaches the selected author to a book, and saves through the service layer.
+    Integrity violations such as duplicate email or duplicate ISBN are caught and shown as form errors.
+</p>
+<pre><code>@PostMapping("/books")
+public String createBook(@Valid @ModelAttribute Book book,
+                         BindingResult bindingResult,
+                         @RequestParam Long authorId,
+                         Model model,
+                         RedirectAttributes redirectAttributes) {
+    bookService.save(book, authorId);
+    redirectAttributes.addFlashAttribute("success", "Book added successfully.");
+    return "redirect:/books";
+}</code></pre>
+<img src="screenshots/add-book.png" alt="Add book form screenshot">
+
+<h2>5. Read Operation</h2>
+<p>
+    The <code>/books</code> and <code>/authors</code> pages list all rows. The book listing also displays the custom inner
+    join result from the repository layer.
+</p>
+<pre><code>@Query("""
+select b.id as bookId, b.title as title, b.isbn as isbn,
+       b.publishedYear as publishedYear, a.name as authorName,
+       a.specialization as specialization
+from Book b inner join b.author a order by b.id
+""")
+List&lt;BookAuthorView&gt; findBookAuthorDetails();</code></pre>
+<img src="screenshots/books.png" alt="Books list and join result screenshot">
+<img src="screenshots/authors.png" alt="Authors list screenshot">
+
+<h2>6. Update Operation</h2>
+<p>
+    Update links are provided in the list views. The edit pages load existing records, allow changes, and submit back to
+    controller methods that update the existing database row through the service layer.
+</p>
+<pre><code>@Transactional
+public Book update(Long id, Book bookDetails, Long authorId) {
+    Book book = findById(id);
+    book.setTitle(bookDetails.getTitle());
+    book.setIsbn(bookDetails.getIsbn());
+    book.setPublishedYear(bookDetails.getPublishedYear());
+    book.setAuthor(authorService.findById(authorId));
+    return bookRepository.save(book);
+}</code></pre>
+
+<h2>7. Testing and Verification</h2>
+<p>
+    Repository tests verify that the seed data creates 10 rows in each table and that the custom inner join query returns
+    joined book-author details. Service tests use Mockito to verify create and update logic. I also tested the running
+    web app using HTTP requests for list, create, and update operations.
+</p>
+<ul>
+    <li><code>mvn test</code>: 4 tests passed, 0 failures.</li>
+    <li><code>mvn clean package</code>: 4 tests passed and executable WAR created.</li>
+    <li>Manual HTTP checks: <code>/books</code> returned 200, create persisted a new book, update changed it, and the list showed the updated row.</li>
+</ul>
+
+<h2>8. Challenges Faced</h2>
+<p>
+    The main issue was JSP packaging. JSPs are most reliable in a Spring Boot executable WAR with files under
+    <code>src/main/webapp/WEB-INF/jsp</code>, so I changed the project packaging from JAR to WAR. Another issue was form
+    validation: the selected author comes from <code>authorId</code>, so validation should not require the nested
+    <code>Book.author</code> object before the controller attaches it.
+</p>
+
+<h2>9. Conclusion</h2>
+<p>
+    The project satisfies the requirements for two JPA entities, sample data population, create/read/update operations,
+    custom inner join query, JSP views with CSS, exception handling, service/repository layering, and unit testing.
+</p>
+</body>
+</html>
